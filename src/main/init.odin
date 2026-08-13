@@ -3,14 +3,33 @@ package main
 import "../common"
 import rl "vendor:raylib"
 
-init :: proc(state: ^common.State) {
-    mapDataImagePath :: "resources/map_data.png"
-	
-	state.map_data_image = rl.LoadImage(mapDataImagePath)
-	state.map_data_texture = rl.LoadTextureFromImage(state.map_data_image)
+Sprite :: enum {
+	Fish,
+	Berries,
 }
 
-deinit ::proc(state: ^common.State) {
-    rl.UnloadImage(state.map_data_image)
-    rl.UnloadTexture(state.map_data_texture)
+sprite_filename :: proc(sprite: Sprite) -> string {
+	switch (sprite) {
+	case .Fish:
+		return "fish.png"
+	case .Berries:
+		return "berries.png"
+	}
+	return ""
+}
+
+init :: proc(state: ^common.State) {
+	state.map_data_image = rl.LoadImage("resources/map_data.png")
+	state.map_data_texture = rl.LoadTextureFromImage(state.map_data_image)
+
+	state.sprites.berries = rl.LoadTexture("resources/berries.png")
+	state.sprites.fish = rl.LoadTexture("resources/fish.png")
+}
+
+deinit :: proc(state: ^common.State) {
+	rl.UnloadImage(state.map_data_image)
+	rl.UnloadTexture(state.map_data_texture)
+
+	rl.UnloadTexture(state.sprites.berries)
+	rl.UnloadTexture(state.sprites.fish)
 }
