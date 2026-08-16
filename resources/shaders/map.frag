@@ -15,8 +15,7 @@ const vec3 contour_lines_color = vec3(181, 139, 97) / vec3(255);
 
 float height(vec2 uv)
 {
-    vec2 view_port = vec2(0.25 + 0.5 * uv.x, 0.5 - 0.5 * uv.y);
-    return texture(texture0, view_port).r;
+    return texture(texture0, uv).r;
 }
 
 float discrete_height(vec2 uv, float steps)

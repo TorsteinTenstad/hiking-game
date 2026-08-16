@@ -7,25 +7,8 @@ import "core:math"
 import "core:strings"
 import rl "vendor:raylib"
 
-target: rl.Vector2 = rl.Vector2{0, 0}
 speed: f32 = 0.02
-player_action: PlayerAction = PlayerAction.Idle
 
-fish: f32 = 0
-berries: f32 = 0
-
-status_happy: f32 = 1.0
-status_food: f32 = 1.0
-status_rest: f32 = 1.0
-
-PlayerAction :: enum {
-	Idle,
-	Walking,
-	Sleeping,
-	Eating,
-	Fishing,
-	Gathering,
-}
 
 draw_status_bar :: proc(s: f32, rect: rl.Rectangle, color: rl.Color) {
 	filled := rect
@@ -113,43 +96,42 @@ menu_pos := rl.Vector2{900, 10}
 step: common.Step_Proc : proc "c" (state: ^common.State) {
 	context = runtime.default_context()
 
-
-	if (rl.IsKeyPressed(rl.KeyboardKey.SPACE)) {
-		player_action = PlayerAction.Idle
+	if (rl.IsKeyPressed(rl.KeyboardKey.SPACE) || rl.IsKeyPressed(rl.KeyboardKey.ESCAPE)) {
+		state.player_action = common.PlayerAction.Idle
 	}
 
-	switch player_action {
+	switch state.player_action {
 	case .Idle:
 	case .Walking:
-		status_food -= 0.05 * rl.GetFrameTime()
-		status_rest -= 0.04 * rl.GetFrameTime()
+		state.status_food -= 0.05 * rl.GetFrameTime()
+		state.status_rest -= 0.04 * rl.GetFrameTime()
 
-		delta := target - state.player_pos
+		delta := state.target - state.player_pos
 		frame_speed := speed / rl.GetFrameTime()
 		delta_length := rl.Vector2Length(delta)
 		frame_step := frame_speed * (delta / delta_length)
 		if (delta_length < frame_speed) {
-			state.player_pos = target
-			player_action = PlayerAction.Idle
+			state.player_pos = state.target
+			state.player_action = common.PlayerAction.Idle
 		} else {
 			state.player_pos += frame_step
 		}
 	case .Sleeping:
-		status_rest += 0.05 * rl.GetFrameTime()
-		if status_rest > 1.0 {
-			status_rest = 1.0
-			player_action = PlayerAction.Idle
+		state.status_rest += 0.05 * rl.GetFrameTime()
+		if state.status_rest > 1.0 {
+			state.status_rest = 1.0
+			state.player_action = common.PlayerAction.Idle
 		}
 	case .Eating:
-		status_food += 0.2 * rl.GetFrameTime()
-		if status_food > 1.0 {
-			status_food = 1.0
-			player_action = PlayerAction.Idle
+		state.status_food += 0.2 * rl.GetFrameTime()
+		if state.status_food > 1.0 {
+			state.status_food = 1.0
+			state.player_action = common.PlayerAction.Idle
 		}
 	case .Fishing:
-		fish += 0.2 * rl.GetFrameTime()
+		state.fish += 0.2 * rl.GetFrameTime()
 	case .Gathering:
-		berries += 0.6 * rl.GetFrameTime()
+		state.berries += 0.6 * rl.GetFrameTime()
 	}
 
 	rl.ClearBackground(rl.BLACK)
@@ -166,25 +148,52 @@ step: common.Step_Proc : proc "c" (state: ^common.State) {
 	)
 	rl.EndShaderMode()
 
-	if (player_action == PlayerAction.Walking) {
-		rl.DrawCircleV(target, 10, rl.YELLOW)
+	mouse_pos := rl.GetMousePosition()
+	image_x := state.map_data_texture.width * i32(mouse_pos.x) / common.screenHeight
+	image_y := state.map_data_texture.height * i32(mouse_pos.y) / common.screenHeight
+	in_bounds :=
+		image_x < state.water0.mask_image.width && image_y < state.water0.mask_image.height
+	water0_hovered :=
+		in_bounds && rl.GetImageColor(state.water0.mask_image, image_x, image_y).r > 0
+	if (water0_hovered) {
+		rl.DrawTexturePro(
+			state.water0.texture,
+			rl.Rectangle {
+				0,
+				0,
+				f32(state.map_data_texture.width),
+				f32(state.map_data_texture.height),
+			},
+			rl.Rectangle{0, 0, f32(common.screenHeight), f32(common.screenHeight)},
+			rl.Vector2{0, 0},
+			0,
+			rl.Color{0, 121, 241, 100},
+		)
+	}
+
+	if (state.player_action == common.PlayerAction.Walking) {
+		rl.DrawCircleV(state.target, 10, rl.YELLOW)
 	}
 	rl.DrawCircleV(state.player_pos, 5, rl.BLUE)
 
 	draw_status_bar(
-		status_happy,
+		state.status_happy,
 		rl.Rectangle{x = 810, y = 300, width = 200, height = 40},
 		rl.GREEN,
 	)
-	draw_status_bar(status_food, rl.Rectangle{x = 810, y = 350, width = 200, height = 40}, rl.RED)
 	draw_status_bar(
-		status_rest,
+		state.status_food,
+		rl.Rectangle{x = 810, y = 350, width = 200, height = 40},
+		rl.RED,
+	)
+	draw_status_bar(
+		state.status_rest,
 		rl.Rectangle{x = 810, y = 400, width = 200, height = 40},
 		rl.BROWN,
 	)
 
 	action_string := "Unknown"
-	switch player_action {
+	switch state.player_action {
 	case .Idle:
 		action_string = "Idle"
 	case .Walking:
@@ -212,17 +221,23 @@ step: common.Step_Proc : proc "c" (state: ^common.State) {
 	rl.DrawTexture(state.sprites.fish, 810, 620, fish_hovered ? rl.WHITE : rl.GRAY)
 	berries_clicked := berries_hovered && rl.IsMouseButtonPressed(rl.MouseButton.LEFT)
 	fish_clicked := fish_hovered && rl.IsMouseButtonPressed(rl.MouseButton.LEFT)
-	if (fish_clicked && status_food < 1.0) {
-		fish -= 1.0
-		status_food = math.min(1.0, status_food + 0.3)
+	if (fish_clicked && state.status_food < 1.0) {
+		state.fish -= 1.0
+		state.status_food = math.min(1.0, state.status_food + 0.3)
 	}
-	if (berries_clicked && status_food < 1.0) {
-		berries -= 1.0
-		status_food = math.min(1.0, status_food + 0.1)
+	if (berries_clicked && state.status_food < 1.0) {
+		state.berries -= 1.0
+		state.status_food = math.min(1.0, state.status_food + 0.1)
 	}
 
-	rl.DrawText(strings.clone_to_cstring(fmt.tprintf("%0.f", berries)), 950, 520, 64, rl.WHITE)
-	rl.DrawText(strings.clone_to_cstring(fmt.tprintf("%0.f", fish)), 950, 620, 64, rl.WHITE)
+	rl.DrawText(
+		strings.clone_to_cstring(fmt.tprintf("%0.f", state.berries)),
+		950,
+		520,
+		64,
+		rl.WHITE,
+	)
+	rl.DrawText(strings.clone_to_cstring(fmt.tprintf("%0.f", state.fish)), 950, 620, 64, rl.WHITE)
 
 
 	if (menu_open) {
@@ -235,11 +250,20 @@ step: common.Step_Proc : proc "c" (state: ^common.State) {
 		append(&menu.items, MenuItem{text = "Walk here"})
 		append(&menu.items, MenuItem{text = "Sleep"})
 		append(&menu.items, MenuItem{text = "Gather berries"})
-		append(&menu.items, MenuItem{text = "Go fishing"})
-		if (berries > 0) {
+
+		image_x := state.map_data_texture.width * i32(menu_pos.x) / common.screenHeight
+		image_y := state.map_data_texture.height * i32(menu_pos.y) / common.screenHeight
+		in_bounds :=
+			image_x < state.water0.mask_image.width && image_y < state.water0.mask_image.height
+		fishing_enabled :=
+			in_bounds && rl.GetImageColor(state.water0.mask_image, image_x, image_y).r > 0
+		if (fishing_enabled) {
+			append(&menu.items, MenuItem{text = "Go fishing"})
+		}
+		if (state.berries > 0) {
 			append(&menu.items, MenuItem{text = "Eat berries"})
 		}
-		if (fish > 0) {
+		if (state.fish > 0) {
 			append(&menu.items, MenuItem{text = "Eat fish"})
 		}
 
@@ -248,14 +272,14 @@ step: common.Step_Proc : proc "c" (state: ^common.State) {
 			menu_open = false
 
 			if (clicked_index == 0 && rl.GetMousePosition().x < 800) {
-				target = rl.GetMousePosition()
-				player_action = PlayerAction.Walking
+				state.target = rl.GetMousePosition()
+				state.player_action = common.PlayerAction.Walking
 			} else if (clicked_index == 1) {
-				player_action = PlayerAction.Sleeping
+				state.player_action = common.PlayerAction.Sleeping
 			} else if (clicked_index == 2) {
-				player_action = PlayerAction.Gathering
+				state.player_action = common.PlayerAction.Gathering
 			} else if (clicked_index == 3) {
-				player_action = PlayerAction.Fishing
+				state.player_action = common.PlayerAction.Fishing
 			}
 		}
 	}

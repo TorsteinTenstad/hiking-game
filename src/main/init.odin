@@ -19,8 +19,16 @@ sprite_filename :: proc(sprite: Sprite) -> string {
 }
 
 init :: proc(state: ^common.State) {
+	state.status_happy = 1.0
+	state.status_food = 1.0
+	state.status_rest = 1.0
+	state.player_pos = {350, 280}
+
 	state.map_data_image = rl.LoadImage("resources/map_data.png")
 	state.map_data_texture = rl.LoadTextureFromImage(state.map_data_image)
+
+	state.water0.mask_image = rl.LoadImage("resources/water0.png")
+	state.water0.texture = rl.LoadTextureFromImage(state.water0.mask_image)
 
 	state.sprites.berries = rl.LoadTexture("resources/berries.png")
 	state.sprites.fish = rl.LoadTexture("resources/fish.png")
@@ -29,6 +37,9 @@ init :: proc(state: ^common.State) {
 deinit :: proc(state: ^common.State) {
 	rl.UnloadImage(state.map_data_image)
 	rl.UnloadTexture(state.map_data_texture)
+
+	rl.UnloadImage(state.water0.mask_image)
+	rl.UnloadTexture(state.water0.texture)
 
 	rl.UnloadTexture(state.sprites.berries)
 	rl.UnloadTexture(state.sprites.fish)
