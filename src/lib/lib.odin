@@ -41,25 +41,81 @@ draw_status_bar :: proc(s: f32, rect: rl.Rectangle, color: rl.Color) {
 	)
 }
 
+MenuItem :: struct {
+	text: string,
+}
+
+Menu :: struct {
+	pos:   rl.Vector2,
+	items: [dynamic; 8]MenuItem,
+}
+
+run_menu :: proc(menu: ^Menu) -> (int, bool) {
+	point_size: i32 = 10
+	point_size_f := f32(point_size)
+	text_margin: i32 = 10
+	button_margin: i32 = 10
+	font_size: i32 = 32
+
+	max_text_width: i32 = 0
+	for item in menu.items {
+		chars := strings.clone_to_cstring(item.text)
+		max_text_width = math.max(max_text_width, rl.MeasureText(chars, font_size))
+	}
+	n := i32(len(menu.items))
+	rect_height := n * font_size + 2 * n * text_margin + (n + 1) * button_margin
+	rect_width := max_text_width + 2 * text_margin + 2 * button_margin
+
+	rect_x := i32(menu.pos.x) - rect_width / 2
+	rect_y := i32(menu.pos.y) + point_size
+
+	rl.DrawRectangle(rect_x, rect_y, rect_width, rect_height, rl.WHITE)
+	rl.DrawTriangle(
+		menu.pos,
+		menu.pos + rl.Vector2{-point_size_f, point_size_f},
+		menu.pos + rl.Vector2{point_size_f, point_size_f},
+		rl.WHITE,
+	)
+	y := rect_y
+	clicked_item := 0
+	clicked := false
+	for item, idx in menu.items {
+		chars := strings.clone_to_cstring(item.text)
+		text_width := rl.MeasureText(chars, font_size)
+		y += button_margin
+		button_rect := rl.Rectangle {
+			x      = f32(rect_x + button_margin),
+			y      = f32(y),
+			width  = f32(max_text_width + 2 * text_margin),
+			height = f32(font_size + 2 * text_margin),
+		}
+		button_hover := rl.CheckCollisionPointRec(rl.GetMousePosition(), button_rect)
+		button_clicked := button_hover && rl.IsMouseButtonPressed(rl.MouseButton.LEFT)
+		if (button_clicked) {
+			clicked = true
+			clicked_item = idx
+		}
+
+		button_color := button_hover ? rl.YELLOW : rl.GOLD
+		rl.DrawRectangleRec(button_rect, button_color)
+		y += text_margin
+		rl.DrawText(chars, rect_x + rect_width / 2 - text_width / 2, i32(y), font_size, rl.RED)
+		y += font_size + text_margin
+	}
+	return clicked_item, clicked
+}
+
+
+menu_open := false
+menu_pos := rl.Vector2{900, 10}
+
 @(export)
 step: common.Step_Proc : proc "c" (state: ^common.State) {
 	context = runtime.default_context()
 
-	if (rl.IsMouseButtonDown(rl.MouseButton.LEFT) && rl.GetMousePosition().x < 800) {
-		target = rl.GetMousePosition()
-		player_action = PlayerAction.Walking
-	}
+
 	if (rl.IsKeyPressed(rl.KeyboardKey.SPACE)) {
 		player_action = PlayerAction.Idle
-	}
-	if (rl.IsKeyPressed(rl.KeyboardKey.F)) {
-		player_action = PlayerAction.Fishing
-	}
-	if (rl.IsKeyPressed(rl.KeyboardKey.G)) {
-		player_action = PlayerAction.Gathering
-	}
-	if (rl.IsKeyPressed(rl.KeyboardKey.S)) {
-		player_action = PlayerAction.Sleeping
 	}
 
 	switch player_action {
@@ -158,13 +214,53 @@ step: common.Step_Proc : proc "c" (state: ^common.State) {
 	fish_clicked := fish_hovered && rl.IsMouseButtonPressed(rl.MouseButton.LEFT)
 	if (fish_clicked && status_food < 1.0) {
 		fish -= 1.0
-		status_food = math.max(1.0, status_food + 0.3)
+		status_food = math.min(1.0, status_food + 0.3)
 	}
 	if (berries_clicked && status_food < 1.0) {
 		berries -= 1.0
-		status_food = math.max(1.0, status_food + 0.1)
+		status_food = math.min(1.0, status_food + 0.1)
 	}
 
 	rl.DrawText(strings.clone_to_cstring(fmt.tprintf("%0.f", berries)), 950, 520, 64, rl.WHITE)
 	rl.DrawText(strings.clone_to_cstring(fmt.tprintf("%0.f", fish)), 950, 620, 64, rl.WHITE)
+
+
+	if (menu_open) {
+		if (rl.IsMouseButtonPressed(rl.MouseButton.LEFT)) {
+			menu_open = false
+		}
+		menu := Menu {
+			pos = menu_pos,
+		}
+		append(&menu.items, MenuItem{text = "Walk here"})
+		append(&menu.items, MenuItem{text = "Sleep"})
+		append(&menu.items, MenuItem{text = "Gather berries"})
+		append(&menu.items, MenuItem{text = "Go fishing"})
+		if (berries > 0) {
+			append(&menu.items, MenuItem{text = "Eat berries"})
+		}
+		if (fish > 0) {
+			append(&menu.items, MenuItem{text = "Eat fish"})
+		}
+
+		clicked_index, clicked := run_menu(&menu)
+		if (clicked) {
+			menu_open = false
+
+			if (clicked_index == 0 && rl.GetMousePosition().x < 800) {
+				target = rl.GetMousePosition()
+				player_action = PlayerAction.Walking
+			} else if (clicked_index == 1) {
+				player_action = PlayerAction.Sleeping
+			} else if (clicked_index == 2) {
+				player_action = PlayerAction.Gathering
+			} else if (clicked_index == 3) {
+				player_action = PlayerAction.Fishing
+			}
+		}
+	}
+	if (rl.IsMouseButtonPressed(rl.MouseButton.RIGHT)) {
+		menu_open = true
+		menu_pos = rl.GetMousePosition()
+	}
 }
