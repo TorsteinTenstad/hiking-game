@@ -25,13 +25,18 @@ PlayerAction :: enum {
 }
 
 
+Menu :: struct {
+	pos:  rl.Vector2,
+	open: bool,
+}
+
 State :: struct {
 	player_pos:       rl.Vector2,
 	map_shader:       rl.Shader,
 	map_data_image:   rl.Image,
 	map_data_texture: rl.Texture2D,
 	sprites:          Sprites,
-	water0:           TerrainBody,
+	bodies:           [1]TerrainBody,
 	target:           rl.Vector2,
 	player_action:    PlayerAction,
 	fish:             f32,
@@ -39,6 +44,7 @@ State :: struct {
 	status_happy:     f32,
 	status_food:      f32,
 	status_rest:      f32,
+	menu:             Menu,
 }
 
 Step_Proc :: #type proc "c" (state: ^State)

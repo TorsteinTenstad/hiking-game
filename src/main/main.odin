@@ -1,6 +1,8 @@
+#+vet explicit-allocators
 package main
 
 import "../common"
+import "core:fmt"
 import rl "vendor:raylib"
 
 Square_Proc :: proc "c" (x: i32) -> i32
@@ -12,9 +14,10 @@ main :: proc() {
 	vertShaderSourcePath :: "resources/shaders/map.vert"
 	libSourcePath :: "src/lib/lib.odin"
 
-	step_proc: HotreloadProc = init_hotreload_proc("src/lib/lib.odin", "step")
+	step_proc: HotreloadProc = init_hotreload_proc("src/lib/", "step")
 	hotreload(&step_proc)
 	if (!step_proc.proc_found) {
+		fmt.println("step proc not found")
 		return
 	}
 
